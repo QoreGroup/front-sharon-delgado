@@ -25,6 +25,16 @@ Los archivos listos para publicar se generan en la carpeta `dist/`.
 
 Subir el contenido de `dist/` al directorio público del hosting (por ejemplo, `public_html`) y verificar que el hosting sirva `index.html` para las rutas del sitio.
 
+## Actualizar opiniones del carrusel
+
+Las opiniones se cargan desde [`public/opiniones.xlsx`](./public/opiniones.xlsx). Edita la primera hoja, `Opiniones`, conservando estas columnas en la primera fila:
+
+| Nombre | Opinión | Tipo |
+|---|---|---|
+| Nombre que se mostrará | Texto de la opinión | `Ejemplo` o `Cliente` |
+
+Las filas marcadas como `Ejemplo` se identifican como contenido ficticio en el sitio. Para publicar testimonios reales, reemplaza los ejemplos por opiniones autorizadas y cambia el tipo a `Cliente`. Guarda el archivo y recarga la página para ver los cambios; al desplegar, incluye también el archivo Excel en la carpeta `public/` para que Vite lo copie a `dist/`.
+
 ## Información que debe confirmarse antes de publicar
 
 - Correo profesional de Sharon: pendiente de confirmación. No se muestra un correo en la web hasta recibir el dato correcto.
@@ -44,4 +54,4 @@ Subir el contenido de `dist/` al directorio público del hosting (por ejemplo, `
 
 ## Nota
 
-El sitio no incluye promesas de resultados, testimonios ni casos de éxito, ya que no se proporcionó información autorizada para publicar esos contenidos.
+El archivo de opiniones incluye textos y nombres ficticios de ejemplo; reemplázalos por contenido real y autorizado antes de publicar.
