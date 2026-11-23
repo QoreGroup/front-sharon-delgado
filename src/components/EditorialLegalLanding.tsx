@@ -460,9 +460,9 @@ export const EditorialLegalLanding: React.FC = () => {
               <p className="max-w-md text-sm leading-7 text-[#6E6256]">Imágenes de trabajo y perfil profesional de Sharon Delgado.</p>
             </div>
             <div className="grid auto-rows-[230px] grid-cols-2 gap-3 sm:auto-rows-[280px] sm:gap-5 md:grid-cols-3">
-              {gallery.map((item, index) => (
+              {gallery.map((item) => (
                 <div key={item.alt} className={`overflow-hidden bg-[#E9E2D7] ${item.className}`}>
-                  <img src={item.src} alt={item.alt} loading="lazy" className={`h-full w-full object-cover transition duration-700 hover:scale-[1.035] ${index === 0 ? 'object-[50%_30%]' : 'object-center'}`} />
+                  <img src={item.src} alt={item.alt} loading="lazy" className="h-full w-full object-cover object-[center_30%] transition duration-700 hover:scale-[1.035]" />
                 </div>
               ))}
             </div>
