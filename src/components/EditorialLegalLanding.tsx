@@ -4,6 +4,7 @@ import {
   Scale, ShieldCheck, Gavel, Search, Users, MapPin, Clock3,
   Instagram, Linkedin, Facebook, ChevronLeft, ChevronRight, Quote
 } from 'lucide-react';
+import readXlsxFile from 'read-excel-file/browser';
 
 import heroImage from '../assets/images/sharon-delgado-portrait.JPEG';
 import brandLogo from '../assets/images/sharon-delgado-logo-transparent.png';
@@ -42,29 +43,47 @@ const gallery = [
   { src: observingImage, alt: 'Sharon Delgado trabajando en su escritorio', className: 'md:col-span-1' }
 ];
 
-const testimonials = [
-  {
-    name: 'Lucía Martínez',
-    quote: 'Me explicó cada paso con claridad y sentí que mi caso fue atendido con mucha dedicación y profesionalismo.'
-  },
-  {
-    name: 'Carlos Ramírez',
-    quote: 'Recibí orientación clara y oportuna. Agradezco la atención cercana y el cuidado con el que revisó mi situación.'
-  },
-  {
-    name: 'Andrea Flores',
-    quote: 'Su forma de explicar los temas legales me dio más tranquilidad para tomar decisiones informadas.'
-  },
-  {
-    name: 'José Paredes',
-    quote: 'Destaco su compromiso, comunicación constante y la manera ordenada de abordar cada consulta.'
-  },
-  {
-    name: 'Valeria Torres',
-    quote: 'Encontré una atención respetuosa y profesional, con respuestas claras a mis dudas durante el proceso.'
-  }
-];
 const testimonialsPerView = 3;
+
+interface Testimonial {
+  name: string;
+  quote: string;
+  isExample: boolean;
+}
+
+const normalizeText = (value: unknown) =>
+  String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+
+const parseTestimonials = (rows: (string | number | boolean | Date | null)[][]): Testimonial[] => {
+  const [header, ...dataRows] = rows;
+  if (!header) throw new Error('La hoja está vacía.');
+
+  const nameColumn = header.findIndex((value) => normalizeText(value) === 'nombre');
+  const quoteColumn = header.findIndex((value) => normalizeText(value) === 'opinion');
+  const typeColumn = header.findIndex((value) => normalizeText(value) === 'tipo');
+  if (nameColumn < 0 || quoteColumn < 0 || typeColumn < 0) {
+    throw new Error('La primera fila debe incluir las columnas Nombre, Opinión y Tipo.');
+  }
+
+  const parsed = dataRows.flatMap((row, index) => {
+    if (row.every((value) => value === null || String(value).trim() === '')) return [];
+
+    const name = String(row[nameColumn] ?? '').trim();
+    const quote = String(row[quoteColumn] ?? '').trim();
+    const type = normalizeText(row[typeColumn]);
+    if (!name || !quote || !type) {
+      throw new Error(`Completa Nombre, Opinión y Tipo en la fila ${index + 2}.`);
+    }
+    if (type !== 'ejemplo' && type !== 'cliente') {
+      throw new Error(`El Tipo de la fila ${index + 2} debe ser “Ejemplo” o “Cliente”.`);
+    }
+
+    return [{ name, quote, isExample: type === 'ejemplo' }];
+  });
+
+  if (parsed.length === 0) throw new Error('La hoja no contiene opiniones.');
+  return parsed;
+};
 
 const nav = [
   ['Inicio', '#inicio'],
@@ -77,20 +96,54 @@ const nav = [
 
 export const EditorialLegalLanding: React.FC = () => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [activeTestimonialPage, setActiveTestimonialPage] = useState(0);
   const [isTestimonialPaused, setIsTestimonialPaused] = useState(false);
+  const [isLoadingTestimonials, setIsLoadingTestimonials] = useState(true);
+  const [testimonialLoadError, setTestimonialLoadError] = useState<string | null>(null);
   const testimonialTouchStartX = useRef<number | null>(null);
   const closeMenu = () => setMenuOpen(false);
 
   useEffect(() => {
-    if (isTestimonialPaused || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (
+      isTestimonialPaused ||
+      testimonials.length < 2 ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) return;
 
     const intervalId = window.setInterval(() => {
       setActiveTestimonialPage((current) => (current + 1) % testimonials.length);
     }, 5000);
 
     return () => window.clearInterval(intervalId);
-  }, [isTestimonialPaused]);
+  }, [isTestimonialPaused, testimonials.length]);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    const loadTestimonials = async () => {
+      try {
+        const response = await fetch(`${import.meta.env.BASE_URL}opiniones.xlsx`, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`No se pudo leer public/opiniones.xlsx (HTTP ${response.status}).`);
+
+        const [sheet] = await readXlsxFile(await response.blob());
+        if (!sheet) throw new Error('El archivo Excel no contiene hojas.');
+
+        const loadedTestimonials = parseTestimonials(sheet.data);
+        if (isCurrent) setTestimonials(loadedTestimonials);
+      } catch (error) {
+        console.error('Error al cargar las opiniones desde public/opiniones.xlsx:', error);
+        if (isCurrent) {
+          setTestimonialLoadError('No se pudieron cargar las opiniones. Revisa el archivo public/opiniones.xlsx y sus columnas Nombre, Opinión y Tipo.');
+        }
+      } finally {
+        if (isCurrent) setIsLoadingTestimonials(false);
+      }
+    };
+
+    void loadTestimonials();
+    return () => { isCurrent = false; };
+  }, []);
 
   const goTo = (href: string) => {
     closeMenu();
@@ -311,7 +364,7 @@ export const EditorialLegalLanding: React.FC = () => {
           </div>
         </section>
 
-        <section id="opiniones" role="region" aria-roledescription="carrusel" aria-label="Opiniones de ejemplo de clientes" className="scroll-mt-24 bg-[#F8F6F1] py-20 sm:py-28">
+        <section id="opiniones" role="region" aria-roledescription="carrusel" aria-label="Opiniones de clientes" className="scroll-mt-24 bg-[#F8F6F1] py-20 sm:py-28">
           <div className="mx-auto max-w-5xl px-6 sm:px-10">
             <div className="mx-auto max-w-3xl text-center">
               <p className="mb-4 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#927D66]">La experiencia de mis clientes</p>
@@ -329,59 +382,71 @@ export const EditorialLegalLanding: React.FC = () => {
                 }
               }}
             >
-              <div
-                aria-live="off"
-                onTouchStart={handleTestimonialTouchStart}
-                onTouchEnd={handleTestimonialTouchEnd}
-                onTouchCancel={handleTestimonialTouchCancel}
-                className="mt-10 flex min-h-[300px] flex-wrap items-stretch justify-center gap-5 touch-pan-y"
-              >
-                {Array.from({ length: testimonialsPerView }, (_, index) => {
-                  const testimonialIndex = (activeTestimonialPage + index) % testimonials.length;
-                  const testimonial = testimonials[testimonialIndex];
+              {isLoadingTestimonials ? (
+                <p role="status" className="mt-10 py-16 text-center text-sm text-[#6E6256]">Cargando opiniones…</p>
+              ) : testimonialLoadError ? (
+                <p role="alert" className="mt-10 border border-[#DED6CA] bg-[#FBFAF7] px-6 py-10 text-center text-sm leading-7 text-[#6E6256]">{testimonialLoadError}</p>
+              ) : (
+                <>
+                  <div
+                  aria-live="off"
+                  onTouchStart={handleTestimonialTouchStart}
+                  onTouchEnd={handleTestimonialTouchEnd}
+                  onTouchCancel={handleTestimonialTouchCancel}
+                  className="mt-10 flex min-h-[300px] flex-wrap items-stretch justify-center gap-5 touch-pan-y"
+                  >
+                  {Array.from({ length: Math.min(testimonialsPerView, testimonials.length) }, (_, index) => {
+                    const testimonialIndex = (activeTestimonialPage + index) % testimonials.length;
+                    const testimonial = testimonials[testimonialIndex];
 
-                  return (
-                  <article key={testimonial.name} role="group" aria-roledescription="opinión"
-                    aria-label={`Opinión ${testimonialIndex + 1} de ${testimonials.length}`}
-                    className={`w-full flex-col border border-[#DED6CA] bg-[#FBFAF7] px-7 py-8 shadow-[0_16px_50px_-36px_rgba(53,45,38,0.45)] transition-all duration-300 ease-out motion-reduce:transition-none hover:-translate-y-2 hover:border-[#BFB09D] hover:shadow-[0_24px_60px_-32px_rgba(53,45,38,0.55)] sm:w-[calc(50%-0.625rem)] lg:w-[calc(33.333%-0.875rem)] ${index === 0 ? 'flex' : index === 1 ? 'hidden sm:flex' : 'hidden lg:flex'}`}>
-                    <Quote aria-hidden="true" className="mb-5 text-[#A8947C]" size={27} />
-                    <blockquote className="flex flex-1 flex-col">
-                      <p className="font-serif text-xl leading-relaxed text-[#40362D]">
-                        «{testimonial.quote}»
-                      </p>
-                      <footer className="mt-7 border-t border-[#E6E0D7] pt-5">
-                        <p className="font-semibold text-[#4C4034]">{testimonial.name}</p>
-                        <p className="mt-1 text-[9px] uppercase tracking-[0.18em] text-[#927D66]">Cliente de ejemplo</p>
-                      </footer>
-                    </blockquote>
-                  </article>
-                  );
-                })}
-              </div>
+                    return (
+                      <article key={testimonial.name} role="group" aria-roledescription="opinión"
+                        aria-label={`Opinión ${testimonialIndex + 1} de ${testimonials.length}`}
+                        className={`w-full flex-col border border-[#DED6CA] bg-[#FBFAF7] px-7 py-8 shadow-[0_16px_50px_-36px_rgba(53,45,38,0.45)] transition-all duration-300 ease-out motion-reduce:transition-none hover:-translate-y-2 hover:border-[#BFB09D] hover:shadow-[0_24px_60px_-32px_rgba(53,45,38,0.55)] sm:w-[calc(50%-0.625rem)] lg:w-[calc(33.333%-0.875rem)] ${index === 0 ? 'flex' : index === 1 ? 'hidden sm:flex' : 'hidden lg:flex'}`}>
+                        <Quote aria-hidden="true" className="mb-5 text-[#A8947C]" size={27} />
+                        <blockquote className="flex flex-1 flex-col">
+                          <p className="font-serif text-xl leading-relaxed text-[#40362D]">
+                            «{testimonial.quote}»
+                          </p>
+                          <footer className="mt-7 border-t border-[#E6E0D7] pt-5">
+                            <p className="font-semibold text-[#4C4034]">{testimonial.name}</p>
+                            <p className="mt-1 text-[9px] uppercase tracking-[0.18em] text-[#927D66]">{testimonial.isExample ? 'Cliente de ejemplo' : 'Opinión de cliente'}</p>
+                          </footer>
+                        </blockquote>
+                      </article>
+                    );
+                  })}
+                  </div>
 
-              <div className="mt-7 flex items-center justify-center gap-5">
-                <button type="button" onClick={showPreviousTestimonial} aria-label="Mostrar opinión anterior"
-                  className="flex h-11 w-11 items-center justify-center border border-[#CFC4B5] text-[#4C4034] transition hover:bg-[#4C4034] hover:text-white">
-                  <ChevronLeft size={20} />
-                </button>
-                <div className="flex items-center gap-2" aria-label={`Vista ${activeTestimonialPage + 1} de ${testimonials.length}`}>
-                  {testimonials.map((testimonial, index) => (
-                    <button key={testimonial.name} type="button" onClick={() => setActiveTestimonialPage(index)}
-                      aria-label={`Mostrar vista desde la opinión de ${testimonial.name}`}
-                      aria-current={activeTestimonialPage === index ? 'true' : undefined}
-                      className={`h-2.5 rounded-full transition-all ${activeTestimonialPage === index ? 'w-7 bg-[#4C4034]' : 'w-2.5 bg-[#CFC4B5] hover:bg-[#927D66]'}`} />
-                  ))}
-                </div>
-                <button type="button" onClick={showNextTestimonial} aria-label="Mostrar opinión siguiente"
-                  className="flex h-11 w-11 items-center justify-center border border-[#CFC4B5] text-[#4C4034] transition hover:bg-[#4C4034] hover:text-white">
-                  <ChevronRight size={20} />
-                </button>
-              </div>
+                  {testimonials.length > 1 && (
+                  <div className="mt-7 flex items-center justify-center gap-5">
+                    <button type="button" onClick={showPreviousTestimonial} aria-label="Mostrar opinión anterior"
+                      className="flex h-11 w-11 items-center justify-center border border-[#CFC4B5] text-[#4C4034] transition hover:bg-[#4C4034] hover:text-white">
+                      <ChevronLeft size={20} />
+                    </button>
+                    <div className="flex items-center gap-2" aria-label={`Vista ${activeTestimonialPage + 1} de ${testimonials.length}`}>
+                      {testimonials.map((testimonial, index) => (
+                        <button key={`${testimonial.name}-${index}`} type="button" onClick={() => setActiveTestimonialPage(index)}
+                          aria-label={`Mostrar vista desde la opinión de ${testimonial.name}`}
+                          aria-current={activeTestimonialPage === index ? 'true' : undefined}
+                          className={`h-2.5 rounded-full transition-all ${activeTestimonialPage === index ? 'w-7 bg-[#4C4034]' : 'w-2.5 bg-[#CFC4B5] hover:bg-[#927D66]'}`} />
+                      ))}
+                    </div>
+                    <button type="button" onClick={showNextTestimonial} aria-label="Mostrar opinión siguiente"
+                      className="flex h-11 w-11 items-center justify-center border border-[#CFC4B5] text-[#4C4034] transition hover:bg-[#4C4034] hover:text-white">
+                      <ChevronRight size={20} />
+                    </button>
+                  </div>
+                  )}
+                </>
+              )}
             </div>
 
-            <p className="mx-auto mt-5 max-w-3xl text-center text-xs leading-6 text-[#806F5D]">
-              Aviso: estos nombres y opiniones son ejemplos ficticios para mostrar el diseño. Reemplázalos por testimonios reales y autorizados antes de publicar.
-            </p>
+            {testimonials.some((testimonial) => testimonial.isExample) && (
+              <p className="mx-auto mt-5 max-w-3xl text-center text-xs leading-6 text-[#806F5D]">
+                La hoja incluye opiniones de ejemplo. Reemplázalas por testimonios reales y autorizados antes de publicar y cambia su Tipo a «Cliente».
+              </p>
+            )}
           </div>
         </section>
 
