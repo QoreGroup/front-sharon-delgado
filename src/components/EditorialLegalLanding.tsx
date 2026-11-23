@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ArrowDown, ArrowRight, ArrowUpRight, Menu, X, MessageCircle,
   Scale, ShieldCheck, Gavel, Search, Users, MapPin, Clock3,
-  Instagram, Linkedin, Facebook
+  Instagram, Linkedin, Facebook, ChevronLeft, ChevronRight, Quote
 } from 'lucide-react';
 
 import heroImage from '../assets/images/sharon-delgado-portrait.JPEG';
-import brandLogo from '../assets/images/sharon-delgado-logo.png';
+import brandLogo from '../assets/images/sharon-delgado-logo-transparent.png';
 import profileImage from '../assets/images/sharon-analizando.JPG.jpeg';
 import readingImage from '../assets/images/sharon-leyendo.PNG';
 import casualImage from '../assets/images/sharon-casual.jpeg';
@@ -42,21 +42,89 @@ const gallery = [
   { src: observingImage, alt: 'Sharon Delgado trabajando en su escritorio', className: 'md:col-span-1' }
 ];
 
+const testimonials = [
+  {
+    name: 'Lucía Martínez',
+    quote: 'Me explicó cada paso con claridad y sentí que mi caso fue atendido con mucha dedicación y profesionalismo.'
+  },
+  {
+    name: 'Carlos Ramírez',
+    quote: 'Recibí orientación clara y oportuna. Agradezco la atención cercana y el cuidado con el que revisó mi situación.'
+  },
+  {
+    name: 'Andrea Flores',
+    quote: 'Su forma de explicar los temas legales me dio más tranquilidad para tomar decisiones informadas.'
+  },
+  {
+    name: 'José Paredes',
+    quote: 'Destaco su compromiso, comunicación constante y la manera ordenada de abordar cada consulta.'
+  },
+  {
+    name: 'Valeria Torres',
+    quote: 'Encontré una atención respetuosa y profesional, con respuestas claras a mis dudas durante el proceso.'
+  }
+];
+const testimonialsPerView = 3;
+
 const nav = [
   ['Inicio', '#inicio'],
   ['Sobre mí', '#sobre-mi'],
   ['Servicios', '#servicios'],
   ['Enfoque', '#enfoque'],
+  ['Opiniones', '#opiniones'],
   ['Contacto', '#contacto']
 ] as const;
 
 export const EditorialLegalLanding: React.FC = () => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [activeTestimonialPage, setActiveTestimonialPage] = useState(0);
+  const [isTestimonialPaused, setIsTestimonialPaused] = useState(false);
+  const testimonialTouchStartX = useRef<number | null>(null);
   const closeMenu = () => setMenuOpen(false);
+
+  useEffect(() => {
+    if (isTestimonialPaused || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const intervalId = window.setInterval(() => {
+      setActiveTestimonialPage((current) => (current + 1) % testimonials.length);
+    }, 5000);
+
+    return () => window.clearInterval(intervalId);
+  }, [isTestimonialPaused]);
 
   const goTo = (href: string) => {
     closeMenu();
     document.querySelector(href)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const showPreviousTestimonial = () => {
+    setActiveTestimonialPage((current) => (current - 1 + testimonials.length) % testimonials.length);
+  };
+  const showNextTestimonial = () => {
+    setActiveTestimonialPage((current) => (current + 1) % testimonials.length);
+  };
+  const handleTestimonialTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    testimonialTouchStartX.current = event.changedTouches[0]?.clientX ?? null;
+    setIsTestimonialPaused(true);
+  };
+  const handleTestimonialTouchEnd = (event: React.TouchEvent<HTMLDivElement>) => {
+    const startX = testimonialTouchStartX.current;
+    const endX = event.changedTouches[0]?.clientX;
+    testimonialTouchStartX.current = null;
+
+    if (startX !== null && endX !== undefined) {
+      const distance = endX - startX;
+      if (Math.abs(distance) > 40) {
+        if (distance < 0) showNextTestimonial();
+        else showPreviousTestimonial();
+      }
+    }
+
+    setIsTestimonialPaused(false);
+  };
+  const handleTestimonialTouchCancel = () => {
+    testimonialTouchStartX.current = null;
+    setIsTestimonialPaused(false);
   };
 
   return (
@@ -240,6 +308,80 @@ export const EditorialLegalLanding: React.FC = () => {
               <img src={thinkingImage} alt="Sharon Delgado reflexionando sobre un asunto jurídico" className="aspect-[4/5] w-full object-cover object-center" />
               <div className="absolute -bottom-5 -left-5 hidden h-28 w-28 border-b border-l border-[#A8947C] lg:block" />
             </div>
+          </div>
+        </section>
+
+        <section id="opiniones" role="region" aria-roledescription="carrusel" aria-label="Opiniones de ejemplo de clientes" className="scroll-mt-24 bg-[#F8F6F1] py-20 sm:py-28">
+          <div className="mx-auto max-w-5xl px-6 sm:px-10">
+            <div className="mx-auto max-w-3xl text-center">
+              <p className="mb-4 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#927D66]">La experiencia de mis clientes</p>
+              <h2 className="font-serif text-4xl font-normal leading-tight text-[#352D26] sm:text-5xl">Opiniones que inspiran confianza</h2>
+              <p className="mx-auto mt-5 max-w-2xl text-sm leading-7 text-[#6E6256]">Cada experiencia refleja el valor de una atención cercana, clara y comprometida.</p>
+            </div>
+
+            <div
+              onMouseEnter={() => setIsTestimonialPaused(true)}
+              onMouseLeave={() => setIsTestimonialPaused(false)}
+              onFocusCapture={() => setIsTestimonialPaused(true)}
+              onBlurCapture={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                  setIsTestimonialPaused(false);
+                }
+              }}
+            >
+              <div
+                aria-live="off"
+                onTouchStart={handleTestimonialTouchStart}
+                onTouchEnd={handleTestimonialTouchEnd}
+                onTouchCancel={handleTestimonialTouchCancel}
+                className="mt-10 flex min-h-[300px] flex-wrap items-stretch justify-center gap-5 touch-pan-y"
+              >
+                {Array.from({ length: testimonialsPerView }, (_, index) => {
+                  const testimonialIndex = (activeTestimonialPage + index) % testimonials.length;
+                  const testimonial = testimonials[testimonialIndex];
+
+                  return (
+                  <article key={testimonial.name} role="group" aria-roledescription="opinión"
+                    aria-label={`Opinión ${testimonialIndex + 1} de ${testimonials.length}`}
+                    className={`w-full flex-col border border-[#DED6CA] bg-[#FBFAF7] px-7 py-8 shadow-[0_16px_50px_-36px_rgba(53,45,38,0.45)] transition-all duration-300 ease-out motion-reduce:transition-none hover:-translate-y-2 hover:border-[#BFB09D] hover:shadow-[0_24px_60px_-32px_rgba(53,45,38,0.55)] sm:w-[calc(50%-0.625rem)] lg:w-[calc(33.333%-0.875rem)] ${index === 0 ? 'flex' : index === 1 ? 'hidden sm:flex' : 'hidden lg:flex'}`}>
+                    <Quote aria-hidden="true" className="mb-5 text-[#A8947C]" size={27} />
+                    <blockquote className="flex flex-1 flex-col">
+                      <p className="font-serif text-xl leading-relaxed text-[#40362D]">
+                        «{testimonial.quote}»
+                      </p>
+                      <footer className="mt-7 border-t border-[#E6E0D7] pt-5">
+                        <p className="font-semibold text-[#4C4034]">{testimonial.name}</p>
+                        <p className="mt-1 text-[9px] uppercase tracking-[0.18em] text-[#927D66]">Cliente de ejemplo</p>
+                      </footer>
+                    </blockquote>
+                  </article>
+                  );
+                })}
+              </div>
+
+              <div className="mt-7 flex items-center justify-center gap-5">
+                <button type="button" onClick={showPreviousTestimonial} aria-label="Mostrar opinión anterior"
+                  className="flex h-11 w-11 items-center justify-center border border-[#CFC4B5] text-[#4C4034] transition hover:bg-[#4C4034] hover:text-white">
+                  <ChevronLeft size={20} />
+                </button>
+                <div className="flex items-center gap-2" aria-label={`Vista ${activeTestimonialPage + 1} de ${testimonials.length}`}>
+                  {testimonials.map((testimonial, index) => (
+                    <button key={testimonial.name} type="button" onClick={() => setActiveTestimonialPage(index)}
+                      aria-label={`Mostrar vista desde la opinión de ${testimonial.name}`}
+                      aria-current={activeTestimonialPage === index ? 'true' : undefined}
+                      className={`h-2.5 rounded-full transition-all ${activeTestimonialPage === index ? 'w-7 bg-[#4C4034]' : 'w-2.5 bg-[#CFC4B5] hover:bg-[#927D66]'}`} />
+                  ))}
+                </div>
+                <button type="button" onClick={showNextTestimonial} aria-label="Mostrar opinión siguiente"
+                  className="flex h-11 w-11 items-center justify-center border border-[#CFC4B5] text-[#4C4034] transition hover:bg-[#4C4034] hover:text-white">
+                  <ChevronRight size={20} />
+                </button>
+              </div>
+            </div>
+
+            <p className="mx-auto mt-5 max-w-3xl text-center text-xs leading-6 text-[#806F5D]">
+              Aviso: estos nombres y opiniones son ejemplos ficticios para mostrar el diseño. Reemplázalos por testimonios reales y autorizados antes de publicar.
+            </p>
           </div>
         </section>
 
